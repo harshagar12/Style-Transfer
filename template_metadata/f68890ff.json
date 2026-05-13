@@ -1,0 +1,523 @@
+{
+  "table_of_contents": [
+    "Executive Summary",
+    "Background and Context",
+    "Methodology",
+    "Key Findings",
+    "Recommendations",
+    "Conclusion"
+  ],
+  "title": {
+    "text": "TECHNICAL REPORT",
+    "style": {
+      "font_name": "Arial",
+      "font_size": 26.0,
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "color": "1F3864"
+    }
+  },
+  "sections": [
+    {
+      "heading": "Executive Summary",
+      "heading_style": {
+        "font_name": "Arial",
+        "font_size": 18.0,
+        "bold": true,
+        "italic": false,
+        "underline": false,
+        "color": "1F3864"
+      },
+      "styles": {
+        "paragraph": {
+          "font_name": "Georgia",
+          "font_size": 12.0,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "color": "1A1A1A"
+        },
+        "subheading": {
+          "font_name": "Arial",
+          "font_size": 14.0,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "color": "2E75B5"
+        },
+        "list_item": {
+          "font_name": "Georgia",
+          "font_size": 12.0,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "color": "1A1A1A"
+        },
+        "table": {
+          "font_name": "Arial",
+          "font_size": 11.0,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "color": "1F3864"
+        }
+      },
+      "content": [
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "table",
+          "rows": 5,
+          "cols": 4
+        }
+      ]
+    },
+    {
+      "heading": "Background and Context",
+      "heading_style": {
+        "font_name": "Arial",
+        "font_size": 18.0,
+        "bold": true,
+        "italic": false,
+        "underline": false,
+        "color": "1F3864"
+      },
+      "styles": {
+        "paragraph": {
+          "font_name": "Georgia",
+          "font_size": 12.0,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "color": "1A1A1A"
+        },
+        "subheading": {
+          "font_name": "Arial",
+          "font_size": 14.0,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "color": "2E75B5"
+        },
+        "list_item": {
+          "font_name": "Georgia",
+          "font_size": 12.0,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "color": "1A1A1A"
+        },
+        "table": {
+          "font_name": "Arial",
+          "font_size": 11.0,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "color": "1F3864"
+        }
+      },
+      "content": [
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "table",
+          "rows": 6,
+          "cols": 4
+        }
+      ]
+    },
+    {
+      "heading": "Methodology",
+      "heading_style": {
+        "font_name": "Arial",
+        "font_size": 18.0,
+        "bold": true,
+        "italic": false,
+        "underline": false,
+        "color": "1F3864"
+      },
+      "styles": {
+        "paragraph": {
+          "font_name": "Georgia",
+          "font_size": 12.0,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "color": "1A1A1A"
+        },
+        "subheading": {
+          "font_name": "Arial",
+          "font_size": 14.0,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "color": "2E75B5"
+        },
+        "list_item": {
+          "font_name": "Georgia",
+          "font_size": 12.0,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "color": "1A1A1A"
+        },
+        "table": {}
+      },
+      "content": [
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        }
+      ]
+    },
+    {
+      "heading": "Key Findings",
+      "heading_style": {
+        "font_name": "Arial",
+        "font_size": 18.0,
+        "bold": true,
+        "italic": false,
+        "underline": false,
+        "color": "1F3864"
+      },
+      "styles": {
+        "paragraph": {
+          "font_name": "Georgia",
+          "font_size": 12.0,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "color": "1A1A1A"
+        },
+        "subheading": {
+          "font_name": "Arial",
+          "font_size": 14.0,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "color": "2E75B5"
+        },
+        "list_item": {
+          "font_name": "Georgia",
+          "font_size": 12.0,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "color": "1A1A1A"
+        },
+        "table": {
+          "font_name": "Arial",
+          "font_size": 11.0,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "color": "1F3864"
+        }
+      },
+      "content": [
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "table",
+          "rows": 6,
+          "cols": 4
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "table",
+          "rows": 7,
+          "cols": 5
+        }
+      ]
+    },
+    {
+      "heading": "Recommendations",
+      "heading_style": {
+        "font_name": "Arial",
+        "font_size": 18.0,
+        "bold": true,
+        "italic": false,
+        "underline": false,
+        "color": "1F3864"
+      },
+      "styles": {
+        "paragraph": {
+          "font_name": "Georgia",
+          "font_size": 12.0,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "color": "1A1A1A"
+        },
+        "subheading": {
+          "font_name": "Arial",
+          "font_size": 14.0,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "color": "2E75B5"
+        },
+        "list_item": {
+          "font_name": "Georgia",
+          "font_size": 12.0,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "color": "1A1A1A"
+        },
+        "table": {
+          "font_name": "Arial",
+          "font_size": 11.0,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "color": "1F3864"
+        }
+      },
+      "content": [
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "list_item"
+        },
+        {
+          "type": "subheading"
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "table",
+          "rows": 6,
+          "cols": 4
+        }
+      ]
+    },
+    {
+      "heading": "Conclusion",
+      "heading_style": {
+        "font_name": "Arial",
+        "font_size": 18.0,
+        "bold": true,
+        "italic": false,
+        "underline": false,
+        "color": "1F3864"
+      },
+      "styles": {
+        "paragraph": {
+          "font_name": "Georgia",
+          "font_size": 12.0,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "color": "1A1A1A"
+        },
+        "subheading": {},
+        "list_item": {},
+        "table": {}
+      },
+      "content": [
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "paragraph"
+        }
+      ]
+    }
+  ],
+  "layout": {
+    "page_size": "A4"
+  },
+  "basic_style": {
+    "font_name": "Arial",
+    "font_size": 26.0,
+    "bold": true,
+    "italic": false,
+    "underline": false,
+    "color": "1F3864"
+  }
+}
