@@ -1,49 +1,50 @@
 # Setup & Getting Started Guide
 
+This guide describes how to configure and run the full report generation pipeline, including the FastAPI backend server and the simple wide-layout Streamlit frontend.
+
+---
+
 ## Prerequisites
 
 - Windows/Linux/Mac with Python 3.8+
-- Docker (for Gotenberg)
-- A Google Generative AI API key (free tier available)
+- Docker installed and running (required for Gotenberg PDF conversion)
+- A Google Generative AI API key (from Gemini)
+
+---
 
 ## Step-by-Step Setup
 
-### 1. Clone/Navigate to Project
-
+### 1. Clone/Navigate to the Project Folder
+Open your terminal and navigate to the project directory:
 ```powershell
 cd "d:\Programs\Tecore Labs Internship\Style Transfer"
 ```
 
-### 2. Create Virtual Environment
-
+### 2. Create a Virtual Environment
 ```powershell
 python -m venv venv
 venv\Scripts\Activate.ps1
 ```
 
 ### 3. Install Dependencies
-
+This will install all backend and frontend packages, including FastAPI, `python-docx`, `google-generativeai`, and `streamlit`:
 ```powershell
 pip install -r requirements.txt
 ```
 
-### 4. Get Gemini API Key
+### 4. Get a Gemini API Key
+1. Visit [Google AI Studio](https://aistudio.google.com/).
+2. Sign in with your Google account.
+3. Click "Create API Key".
+4. Copy the generated key.
 
-1. Visit: https://makersuite.google.com/app/apikey
-2. Sign in with Google account
-3. Click "Create API key"
-4. Copy the key
-
-### 5. Configure Environment
-
-Create `.env` file in project root:
-
-```bash
-GEMINI_API_KEY=your_api_key_from_step_4
+### 5. Configure your Environment variables
+Create a `.env` file in the root directory:
+```env
+GEMINI_API_KEY=your_api_key_here
 GOTENBERG_URL=http://localhost:3000
 ```
-
-**Or use PowerShell:**
+**Or do this via PowerShell:**
 ```powershell
 @"
 GEMINI_API_KEY=your_api_key_here
@@ -51,259 +52,127 @@ GOTENBERG_URL=http://localhost:3000
 "@ | Out-File .env
 ```
 
-### 6. Start Gotenberg (Docker)
+### 6. Start the Gotenberg Service (Docker)
+Gotenberg converts the parsed HTML reports into styled, print-ready PDFs.
+Make sure Docker Desktop is running, then start the container:
+```bash
+docker run -p 3000:3000 gotenberg/gotenberg:latest
+```
+This runs in the foreground. Keep this terminal window open.
 
-**First time only - install Docker:**
-- Download from https://www.docker.com/products/docker-desktop
+---
 
-**Start Gotenberg:**
+## Running the Application
+
+To run the full suite, you need to launch both the **FastAPI Backend** and the **Streamlit Frontend**:
+
+### Terminal 1: Gotenberg (Docker Container)
+Keep the Gotenberg docker terminal open and running.
+
+### Terminal 2: FastAPI Backend Server
+Open a new PowerShell terminal, activate the environment, and start uvicorn:
+```powershell
+venv\Scripts\Activate.ps1
+uvicorn main:app --reload
+```
+You should see:
+```text
+Uvicorn running on http://127.0.0.1:8000
+```
+*   **Interactive API Docs**: http://127.0.0.1:8000/docs
+
+### Terminal 3: Streamlit Frontend Web App
+Open another PowerShell terminal, activate the environment, and start Streamlit:
+```powershell
+venv\Scripts\Activate.ps1
+streamlit run app.py
+```
+*   **Web App URL**: http://localhost:8501
+*   Streamlit will open a clean, simple, wide-layout user interface in your default browser.
+
+---
+
+## Project Structure
+
+```text
+.
+├── main.py                      # FastAPI backend application
+├── app.py                       # Streamlit web application
+├── utils_extraction.py          # Extractor for DOCX font, color, and alignment properties
+├── utils_markdown.py          # Markdown-to-HTML parser with custom template CSS mapping
+├── requirements.txt             # Python package dependencies
+├── .env                        # Local environment configuration variables
+├── README.MD                   # Project overview & documentation
+├── SETUP_GUIDE.md              # This setup guide
+└── template_metadata/          # Folder storing parsed template JSON configurations
+```
+
+---
+
+## First Usage Web Workflow
+
+1.  **Prepare a Template Document**:
+    Create a `.docx` file in Microsoft Word. Try giving it a centered Title (large, bold), some body text, a few bold headings, subheadings, and lists.
+2.  **Upload the Template**:
+    *   Open `http://localhost:8501` in your browser.
+    *   Navigate to the **Template Upload** tab.
+    *   Drag and drop your `.docx` file, enter an optional custom name, and click **Upload Template**.
+    *   Copy the generated **Template ID** shown on screen.
+3.  **Generate Markdown with AI**:
+    *   Go to the **Markdown Generation** tab.
+    *   Select your uploaded template from the dropdown.
+    *   In the tall 300px text area, type a prompt describing your report.
+    *   Click **Generate Markdown**. The Gemini API will generate structured content following your template's layout.
+4.  **Export to Polished PDF**:
+    *   Go to the **PDF Generation** tab.
+    *   The generated markdown from the previous tab will be pre-filled automatically inside the large 600px editor.
+    *   Adjust the output filename if desired, verify the template dropdown selection, and click **Generate PDF**.
+    *   Click **Download PDF** to save the polished document (retaining your original template's font faces, colors, and centered/justified text alignments).
+
+---
+
+## Setup & Running Troubleshooting
+
+### Gotenberg Connection Error
+Make sure Docker Desktop is open and run:
+```bash
+docker ps
+```
+If you see no active containers, start Gotenberg again:
 ```bash
 docker run -p 3000:3000 gotenberg/gotenberg:latest
 ```
 
-This will run in the foreground. Keep this terminal open.
-
-### 7. Start the FastAPI Server
-
-In a new PowerShell terminal:
-
+### Module Not Found / Streamlit Command Not Found
+Ensure your virtual environment is properly activated in your active terminal:
 ```powershell
-# Activate venv if not already done
 venv\Scripts\Activate.ps1
-
-# Start the server
-uvicorn main:app --reload
+pip install -r requirements.txt
 ```
 
-You should see:
-```
-Uvicorn running on http://127.0.0.1:8000
-```
+### Headings styling looks incorrect
+If the body subheadings or lists are using Title formatting:
+*   Pre-headings (unnamed header metadata) are skipped during merging to prevent title style leakage.
+*   Make sure headings in your original `.docx` are using explicit paragraph heading styles.
+*   Simply re-upload your template inside the web app to overwrite the metadata configuration instantly.
 
-### 8. Access the API
-
-- **API Documentation**: http://127.0.0.1:8000/docs
-- **Alternative Docs**: http://127.0.0.1:8000/redoc
-
-## Verify Installation
-
-Test the API with a simple request:
-
-```powershell
-# Test that API is running
-curl http://127.0.0.1:8000/docs
-# Should return HTML documentation page
-```
-
-## Project Structure
-
-```
-.
-├── main.py                      # Main API application
-├── requirements.txt             # Python packages
-├── .env                        # Environment variables (create this)
-├── .env.example                # Template for .env
-├── README.MD                   # Project overview
-├── IMPLEMENTATION_GUIDE.md     # Detailed usage guide
-├── API_QUICK_REFERENCE.md      # Quick API reference
-├── ARCHITECTURE.md             # System architecture
-├── SETUP_GUIDE.md              # This file
-└── template_metadata/          # Stores extracted templates
-    └── (JSON files generated after uploading templates)
-```
-
-## First Usage Example
-
-### 1. Prepare a Template Document
-
-Create a simple `.docx` file named `template.docx` with:
-- Title: "Quarterly Report" (large, bold)
-- Heading 1: "Executive Summary" (bold, smaller than title)
-- Some body text (regular formatting)
-- Heading 2: "Key Metrics"
-- More body text
-- Heading 3: "Action Items"
-
-### 2. Upload Template
-
-```powershell
-$file = "C:\path\to\template.docx"
-$response = curl -F "file=@$file" http://127.0.0.1:8000/upload-template | ConvertFrom-Json
-$template_id = $response.template_id
-
-Write-Host "Template ID: $template_id"
-Write-Host "Sections: $($response.table_of_contents -join ', ')"
-```
-
-Save the `template_id` - you'll use it for next steps.
-
-### 3. Generate Markdown
-
-```powershell
-$body = @{
-  template_id = $template_id
-  prompt = "Generate a Q4 2024 quarterly report with sales metrics, achievements, and goals"
-} | ConvertTo-Json
-
-$response = curl -X POST http://127.0.0.1:8000/generate-markdown `
-  -H "Content-Type: application/json" `
-  -d $body | ConvertFrom-Json
-
-$markdown = $response.markdown
-Write-Host "Markdown generated!"
-```
-
-### 4. Generate PDF
-
-```powershell
-$body = @{
-  template_id = $template_id
-  markdown = $markdown
-  filename = "quarterly_report.pdf"
-} | ConvertTo-Json
-
-curl -X POST http://127.0.0.1:8000/generate-pdf `
-  -H "Content-Type: application/json" `
-  -d $body `
-  -o quarterly_report.pdf
-
-Write-Host "PDF generated: quarterly_report.pdf"
-```
-
-Done! Open `quarterly_report.pdf` to see the result.
-
-## Running the System
-
-### Development Mode
-
-```powershell
-# Terminal 1: Start Gotenberg
-docker run -p 3000:3000 gotenberg/gotenberg:latest
-
-# Terminal 2: Start FastAPI with auto-reload
-venv\Scripts\Activate.ps1
-uvicorn main:app --reload
-```
-
-### Production Mode
-
-```powershell
-# Terminal 1: Start Gotenberg (background)
-docker run -d -p 3000:3000 gotenberg/gotenberg:latest
-
-# Terminal 2: Start FastAPI (production)
-venv\Scripts\Activate.ps1
-uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
-## Troubleshooting Setup
-
-### "Module not found" Error
-```powershell
-# Make sure venv is activated
-venv\Scripts\Activate.ps1
-
-# Reinstall packages
-pip install -r requirements.txt --force-reinstall
-```
-
-### Gemini API Key Error
-- Verify key is copied correctly (no extra spaces)
-- Check `.env` file has no typos
-- Restart the API server after updating `.env`
-
-### Gotenberg Connection Error
-```powershell
-# Check if Docker is running
-docker ps
-
-# If not, start Docker Desktop and run:
-docker run -p 3000:3000 gotenberg/gotenberg:latest
-```
-
-### Port Already in Use
-```powershell
-# FastAPI on different port:
-uvicorn main:app --port 8001
-
-# Or find and kill process using port 8000:
-netstat -ano | findstr :8000
-taskkill /PID <PID> /F
-```
-
-## Tips
-
-1. **Keep Terminal Windows Organized**
-   - Use Windows Terminal or ConEmu to manage multiple PowerShell tabs
-   - Terminal 1: Gotenberg (keep running)
-   - Terminal 2: FastAPI (keep running)
-   - Terminal 3: Run test commands
-
-2. **Test API Interactively**
-   - Use Swagger UI: http://127.0.0.1:8000/docs
-   - Click "Try it out" on each endpoint
-   - Great for learning the API
-
-3. **Save Template IDs**
-   ```powershell
-   # Create a templates.txt file
-   @"
-   sales_report_template = abc123de
-   progress_report_template = xyz789ab
-   performance_review_template = def456gh
-   "@ | Out-File templates.txt
-   ```
-
-4. **Reuse Templates**
-   - Upload a template once
-   - Generate unlimited reports with same template_id
-   - Saves time and maintains consistency
-
-## Next Steps
-
-- Read [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) for detailed workflows
-- Check [API_QUICK_REFERENCE.md](API_QUICK_REFERENCE.md) for API syntax
-- See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details
-- Explore API docs at http://127.0.0.1:8000/docs
+---
 
 ## Common Commands Cheat Sheet
 
 ```powershell
-# Activate virtual environment
+# Activate the virtual environment
 venv\Scripts\Activate.ps1
 
-# Install/update packages
-pip install -r requirements.txt
-pip install -r requirements.txt --upgrade
-
-# Start Gotenberg (Docker)
+# Run the Gotenberg service (Docker)
 docker run -p 3000:3000 gotenberg/gotenberg:latest
 
-# Start FastAPI
+# Run the backend API server
 uvicorn main:app --reload
 
-# Test API availability
-curl http://127.0.0.1:8000/docs
+# Run the Streamlit web interface
+streamlit run app.py
 
-# List templates
+# Check existing parsed templates
 Get-ChildItem template_metadata/
-
-# Create .env from example
-Copy-Item .env.example .env
 ```
-
-## Support & Help
-
-- **API Documentation**: http://127.0.0.1:8000/docs
-- **Gemini Docs**: https://ai.google.dev/
-- **Gotenberg Docs**: https://gotenberg.dev/
-- **FastAPI Docs**: https://fastapi.tiangolo.com/
-
----
-
-**Ready to use! 🚀**
-
-For the first time, follow steps 1-8 above. After that, just:
-1. Ensure Gotenberg is running (Terminal 1)
-2. Ensure FastAPI is running (Terminal 2)
-3. Use the API!

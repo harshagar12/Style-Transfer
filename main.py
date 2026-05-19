@@ -103,31 +103,31 @@ async def generate_markdown(req: MarkdownGenerateRequest):
 
         # Build context for Gemini about the template structure
         template_context = f"""
-Template Structure (follow this EXACTLY — same number of sections, same order, same heading names, same content block types in each section):
+                                Template Structure (follow this EXACTLY — same number of sections, same order, same heading names, same content block types in each section):
 
-{section_schema}
+                                {section_schema}
 
-Original Template Title: {title_text} (Please generate a new, relevant title based on the prompt)
-"""
+                                Original Template Title: {title_text} (Please generate a new, relevant title based on the prompt)
+                            """
 
         # Create prompt for Gemini
         full_prompt = f"""{template_context}
 
-Generate a professional report in Markdown using this prompt:
-{req.prompt}
+                        Generate a professional report in Markdown using this prompt:
+                        {req.prompt}
 
-STRICT INSTRUCTIONS:
-1. First line MUST be a level 1 heading ("# <Your Generated Title>") that reflects the prompt's subject.
-2. You MUST produce exactly {len(sections)} sections in the SAME ORDER as the schema above.
-3. Each section MUST use the EXACT heading text shown in the schema (e.g., "## Introduction" not "## Overview").
-4. Inside each section, reproduce the SAME sequence of content blocks:
-    - "### subheading" → write a real ### subheading
-   - "- list item" → write a real bullet list item
-   - "[table: N rows x M cols]" → write a real markdown table with that many rows and columns
-   - "[paragraph]" → write a real paragraph of prose
-5. Use # only for document title, ## for main sections, and ### for subheadings.
-6. Return ONLY the markdown content, no preamble or extra commentary.
-"""
+                        STRICT INSTRUCTIONS:
+                        1. First line MUST be a level 1 heading ("# <Your Generated Title>") that reflects the prompt's subject.
+                        2. You MUST produce exactly {len(sections)} sections in the SAME ORDER as the schema above.
+                        3. Each section MUST use the EXACT heading text shown in the schema (e.g., "## Introduction" not "## Overview").
+                        4. Inside each section, reproduce the SAME sequence of content blocks:
+                            - "### subheading" → write a real ### subheading
+                           - "- list item" → write a real bullet list item
+                           - "[table: N rows x M cols]" → write a real markdown table with that many rows and columns
+                           - "[paragraph]" → write a real paragraph of prose
+                        5. Use # only for document title, ## for main sections, and ### for subheadings.
+                        6. Return ONLY the markdown content, no preamble or extra commentary.
+                        """
 
         # Call Gemini API
         model = genai.GenerativeModel("gemini-3-flash-preview")

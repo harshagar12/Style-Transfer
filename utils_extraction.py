@@ -1,20 +1,14 @@
 import re
 from typing import Dict, Any
+from docx import Document
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 from docx.oxml.table import CT_Tbl
 from docx.oxml.text.paragraph import CT_P
 from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 def extract_metadata_from_docx(doc) -> Dict[str, Any]:
-    """
-    Extract metadata from DOCX in the format:
-    - table_of_contents: list of heading names
-    - title: first para text + styling
-    - sections: list of {heading, heading_style, content (paragraphs/tables/lists)}
-    - layout: page settings
-    - basic_style: fallback style if sections missing
-    """
     metadata = {
         "table_of_contents": [],
         "title": {},
@@ -44,7 +38,6 @@ def extract_metadata_from_docx(doc) -> Dict[str, Any]:
     def heading_level(para: Paragraph, text: str, fmt: Dict[str, Any], base_font: float) -> int:
         style_name = para_style_name(para)
 
-        # Trust Word heading styles first.
         m = re.match(r"heading\s*(\d+)", style_name)
         if m:
             level = int(m.group(1))
@@ -52,13 +45,11 @@ def extract_metadata_from_docx(doc) -> Dict[str, Any]:
                 return level
             return 2
 
-        # Markdown-like hints.
         if text.startswith("##"):
             return 2
         if text.startswith("#"):
             return 1
 
-        # Heuristic: short styled text; strong style => heading, lighter style => subheading.
         if len(text) > 90:
             return 0
         if re.search(r"[\.!?]$", text):
@@ -110,7 +101,6 @@ def extract_metadata_from_docx(doc) -> Dict[str, Any]:
             elif isinstance(child, CT_Tbl):
                 yield "table", Table(child, document)
 
-    # Establish title + base style from the first non-empty paragraph.
     base_font_size = 11.0
     for kind, block in iter_block_items(doc):
         if kind != "paragraph":
@@ -141,7 +131,6 @@ def extract_metadata_from_docx(doc) -> Dict[str, Any]:
 
             fmt = get_run_fmt(run, para, doc)
 
-            # Skip title paragraph if it was already consumed as title.
             if metadata.get("title", {}).get("text") == text and not current_section and not metadata["sections"]:
                 continue
 
@@ -171,7 +160,7 @@ def extract_metadata_from_docx(doc) -> Dict[str, Any]:
                     current_section["styles"]["paragraph"] = fmt
                 current_section["content"].append({"type": "paragraph"})
 
-        else:  # table
+        else:  
             table = block
             if current_section is None:
                 current_section = new_section()
@@ -190,8 +179,9 @@ def extract_metadata_from_docx(doc) -> Dict[str, Any]:
     metadata["table_of_contents"] = toc
     return metadata
 
+# Function to extract font formatting
 def get_run_fmt(run, para, doc):
-    # Extract font formatting
+    
     fmt = {}
 
     try:
@@ -257,5 +247,26 @@ def get_run_fmt(run, para, doc):
         fmt["color"] = doc_defaults["color"]
     else:
         fmt["color"] = "000000"
+
+    _ALIGN_MAP = {
+        WD_ALIGN_PARAGRAPH.CENTER:  "center",
+        WD_ALIGN_PARAGRAPH.RIGHT:   "right",
+        WD_ALIGN_PARAGRAPH.JUSTIFY: "justify",
+        WD_ALIGN_PARAGRAPH.DISTRIBUTE: "justify",
+    }
+    align = None
+    try:
+        align = para.alignment
+    except Exception:
+        pass
+    if align is None:
+        try:
+            style = para.style
+            while style and align is None:
+                align = style.paragraph_format.alignment
+                style = style.base_style
+        except Exception:
+            pass
+    fmt["alignment"] = _ALIGN_MAP.get(align, "left")
 
     return fmt
