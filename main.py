@@ -3,7 +3,7 @@ import tempfile
 import requests
 import google.generativeai as genai
 
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from docx import Document
 
@@ -17,7 +17,10 @@ app = FastAPI()
 
 # API Endpoint for Uploading a Template File
 @app.post("/upload-template")
-async def upload_template(file: UploadFile = File(...)):
+async def upload_template(
+    file: UploadFile = File(...),
+    template_name: str = Form(None)
+):
 
     # Saving uploaded file temporarily
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".docx")
@@ -28,6 +31,12 @@ async def upload_template(file: UploadFile = File(...)):
 
     # Extract metadata in the required format
     metadata = extract_metadata_from_docx(doc)
+
+    # Override template title name if user provided a custom name
+    if template_name and template_name.strip():
+        if "title" not in metadata or not isinstance(metadata["title"], dict):
+            metadata["title"] = {}
+        metadata["title"]["text"] = template_name.strip()
 
     # Saving metadata
     template_id = uuid.uuid4().hex[:8]

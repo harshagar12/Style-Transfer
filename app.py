@@ -74,8 +74,15 @@ with tab1:
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         )
                     }
+                    payload = {}
+                    if template_name and template_name.strip():
+                        payload["template_name"] = template_name.strip()
+
                     resp = requests.post(
-                        f"{BACKEND_URL}/upload-template", files=files, timeout=60
+                        f"{BACKEND_URL}/upload-template",
+                        files=files,
+                        data=payload,
+                        timeout=60,
                     )
                     resp.raise_for_status()
                     data = resp.json()
