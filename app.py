@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import streamlit as st
 import requests
 
@@ -15,10 +16,6 @@ st.title("📄 Report Generator")
 
 @st.cache_data(ttl=30)
 def fetch_templates() -> dict[str, str]:
-    """
-    Returns {display_name -> template_id} by scanning the local
-    template_metadata directory.
-    """
     meta_dir = os.path.join(os.path.dirname(__file__), "template_metadata")
     templates: dict[str, str] = {}
     if os.path.isdir(meta_dir):
@@ -145,41 +142,78 @@ with tab2:
         elif not prompt_text.strip():
             st.error("Please enter a prompt before generating.")
         else:
-            with st.spinner("Calling Gemini AI — this may take a few seconds…"):
-                try:
-                    payload = {"template_id": tid, "prompt": prompt_text.strip()}
-                    resp = requests.post(
-                        f"{BACKEND_URL}/generate-markdown", json=payload, timeout=120
-                    )
-                    resp.raise_for_status()
-                    data = resp.json()
+            try:
+                payload = {"template_id": tid, "prompt": prompt_text.strip()}
+                resp = requests.post(
+                    f"{BACKEND_URL}/generate-markdown", json=payload, timeout=15
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                if "error" in data:
+                    st.error(f"Backend error: {data['error']}")
+                else:
+                    st.session_state["md_job_id"] = data["job_id"]
+                    st.session_state["md_job_start"] = time.time()
+                    st.session_state["last_markdown"] = ""
+                    st.rerun()
+            except requests.exceptions.ConnectionError:
+                st.error(
+                    f"Could not reach the backend. Make sure the FastAPI server is running on {BACKEND_URL}."
+                )
+            except Exception as exc:
+                st.error(f"Unexpected error: {exc}")
 
-                    if "error" in data:
-                        st.error(f"Backend error: {data['error']}")
-                    else:
-                        md_output = data.get("markdown", "")
-                        st.success("Markdown generated successfully!")
-                        st.session_state["last_markdown"] = md_output
+    job_id = st.session_state.get("md_job_id")
+    if job_id:
+        try:
+            poll_resp = requests.get(f"{BACKEND_URL}/job/{job_id}", timeout=10)
+            poll_resp.raise_for_status()
+            job = poll_resp.json()
+        except Exception as exc:
+            st.error(f"Failed to reach backend while polling: {exc}")
+            st.session_state.pop("md_job_id", None)
+            job = None
 
-                        st.write("**Generated Markdown**")
-                        st.code(md_output, language="markdown")
+        if job:
+            status = job.get("status", "pending")
+            elapsed = int(time.time() - st.session_state.get("md_job_start", time.time()))
 
-                        st.download_button(
-                            label="Download as .md file",
-                            data=md_output,
-                            file_name="report.md",
-                            mime="text/markdown",
-                            key="download_md_file",
-                        )
+            if status == "pending":
+                st.info(f"⏳ Gemini is generating your report… ({elapsed}s elapsed)")
+                time.sleep(2)
+                st.rerun()
 
-                except requests.exceptions.ConnectionError:
-                    st.error(
-                        f"Could not reach the backend. Make sure the FastAPI server is running on {BACKEND_URL}."
-                    )
-                except requests.exceptions.Timeout:
-                    st.error("The request timed out. Gemini generation can take a while — please try again.")
-                except Exception as exc:
-                    st.error(f"Unexpected error: {exc}")
+            elif status == "completed":
+                st.session_state.pop("md_job_id", None)
+                md_output = job.get("markdown", "")
+                st.session_state["last_markdown"] = md_output
+                st.session_state["pdf_markdown_area"] = md_output
+                st.success(f"✅ Markdown generated successfully! (took ~{elapsed}s)")
+                st.write("**Generated Markdown**")
+                st.code(md_output, language="markdown")
+                st.download_button(
+                    label="Download as .md file",
+                    data=md_output,
+                    file_name="report.md",
+                    mime="text/markdown",
+                    key="download_md_file",
+                )
+
+            elif status == "failed":
+                st.session_state.pop("md_job_id", None)
+                st.error(f"❌ Generation failed: {job.get('error', 'Unknown error')}")
+
+    elif st.session_state.get("last_markdown"):
+        md_output = st.session_state["last_markdown"]
+        st.write("**Last Generated Markdown**")
+        st.code(md_output, language="markdown")
+        st.download_button(
+            label="Download as .md file",
+            data=md_output,
+            file_name="report.md",
+            mime="text/markdown",
+            key="download_md_file_cached",
+        )
 
 
 with tab3:
@@ -209,15 +243,13 @@ with tab3:
         key="pdf_filename",
     )
 
-    prefill_md = st.session_state.get("last_markdown", "")
     markdown_input = st.text_area(
         "Markdown content",
-        value=prefill_md,
         height=600,
         placeholder="Paste or type your markdown here…",
         key="pdf_markdown_area",
     )
-    if prefill_md:
+    if st.session_state.get("pdf_markdown_area", "").strip():
         st.caption("Markdown from the Markdown Generation tab was pre-filled. You can edit it freely.")
 
     if st.button("Generate PDF", key="gen_pdf_btn"):

@@ -12,11 +12,12 @@ A comprehensive system featuring a FastAPI backend and a clean, native Streamlit
   - Skips empty heading/title blocks to ensure body-level styles (`subheading`, `paragraph`, `list_item`, `table`) are mapped reliably without bleeding from the title page format.
   - Generates a table of contents and saves a detailed metadata configuration to `template_metadata/<id>.json`.
 
-### Phase 2: AI Report Generation
-- **Markdown Generation** (`POST /generate-markdown`)
+### Phase 2: Asynchronous AI Report Generation
+- **Markdown Generation** (`POST /generate-markdown` + `GET /job/{job_id}`)
   - Accepts a template ID and a custom prompt.
-  - Uses the Gemini API to produce rich markdown content mirroring the structural rules (number of sections, header names, lists, tables) of the template.
-  - Renders output inside the browser with options to view, copy, and download the `.md` file.
+  - Returns a `job_id` **immediately** without waiting for the Gemini API — the generation runs in a background thread.
+  - Clients poll `GET /job/{job_id}` to check status (`pending` → `completed` / `failed`) and retrieve the result when ready.
+  - The Streamlit frontend handles polling automatically, showing a live elapsed-time counter and notifying the user on completion.
 
 ### Phase 3: High-Fidelity PDF Generation
 - **PDF Conversion** (`POST /generate-pdf`)
@@ -27,7 +28,7 @@ A comprehensive system featuring a FastAPI backend and a clean, native Streamlit
 - **Interactive UI** (`app.py`)
   - Built with a wide-layout native Streamlit structure for reading and editing comfort.
   - **Template Upload Tab**: Easy file drops, optional template names, and template ID badge copies.
-  - **Markdown Tab**: Select uploaded templates, submit prompts inside an expansive text area, and preview or download generated markdown.
+  - **Markdown Tab**: Submits a generation job, then polls the backend every 2 seconds with a live `Xsec elapsed` counter. Notifies with a `✅` banner when done, and pre-fills the generated markdown into the PDF tab automatically.
   - **PDF Tab**: Pre-fills markdown for instant processing, provides a tall (600px) interactive text editor for customization, and generates download buttons for polished PDF documents on success.
 
 ## Key files
@@ -125,6 +126,32 @@ Extracted template metadata is parsed and stored inside `template_metadata/`:
     "alignment": "left"
   }
 }
+```
+
+---
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/upload-template` | Upload a `.docx` template; returns `template_id` |
+| `POST` | `/generate-markdown` | Enqueue a Gemini generation job; returns `job_id` instantly |
+| `GET`  | `/job/{job_id}` | Poll for job status (`pending` / `completed` / `failed`) and retrieve markdown |
+| `POST` | `/generate-pdf` | Convert markdown to a styled PDF via Gotenberg |
+| `POST` | `/generate-document` | _(Legacy)_ Generate a `.docx` from plain text |
+
+### Async markdown flow in detail
+```
+Client                        FastAPI backend
+  │                                │
+  │  POST /generate-markdown ──────► enqueue background thread
+  │  ◄── {job_id, status:pending}  │  [Gemini API call running...]
+  │                                │
+  │  GET /job/{job_id} ────────────► {status: "pending"}
+  │  (repeat every 2 s)            │  [still running...]
+  │                                │
+  │  GET /job/{job_id} ────────────► {status: "completed", markdown: "..."}
+  │  ◄── display result            │
 ```
 
 ---
