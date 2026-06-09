@@ -49,9 +49,9 @@ with tab1:
     st.subheader("Upload a Template")
 
     uploaded_file = st.file_uploader(
-        "Select a .docx file",
-        type=["docx"],
-        help="Only Word (.docx) files are accepted.",
+        "Select a .docx or .pdf file",
+        type=["docx", "pdf"],
+        help="Only Word (.docx) or PDF (.pdf) files are accepted.",
     )
     template_name = st.text_input(
         "Custom template name (optional)",
@@ -60,15 +60,20 @@ with tab1:
 
     if st.button("Upload Template", key="upload_btn"):
         if uploaded_file is None:
-            st.error("Please select a .docx file before uploading.")
+            st.error("Please select a .docx or .pdf file before uploading.")
         else:
             with st.spinner("Uploading and processing template…"):
                 try:
+                    if uploaded_file.name.lower().endswith(".pdf"):
+                        mime_type = "application/pdf"
+                    else:
+                        mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
                     files = {
                         "file": (
                             uploaded_file.name,
                             uploaded_file.getvalue(),
-                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            mime_type,
                         )
                     }
                     payload = {}
@@ -302,3 +307,26 @@ with tab3:
                     st.error("The request timed out. PDF generation can take a while — please try again.")
                 except Exception as exc:
                     st.error(f"Unexpected error: {exc}")
+    with st.expander("🔍 Preview HTML (debug — shows what is sent to Gotenberg)"):
+        if st.button("Generate HTML Preview", key="preview_html_btn"):
+            tid = selected_tid_pdf if isinstance(selected_tid_pdf, str) else ""
+            if not tid:
+                st.error("Please select a Template ID.")
+            elif not markdown_input.strip():
+                st.error("Please enter some markdown content.")
+            else:
+                try:
+                    payload = {
+                        "template_id": tid,
+                        "markdown": markdown_input.strip(),
+                        "filename": "debug.pdf",
+                    }
+                    resp = requests.post(
+                        f"{BACKEND_URL}/preview-html",
+                        json=payload,
+                        timeout=30,
+                    )
+                    resp.raise_for_status()
+                    st.code(resp.text, language="html")
+                except Exception as exc:
+                    st.error(f"Preview error: {exc}")

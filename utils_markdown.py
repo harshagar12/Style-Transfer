@@ -1,204 +1,201 @@
 import re
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
+
+def _normalize_heading(text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", str(text).lower())).strip()
+
+
+# ── Public entry point ────────────────────────────────────────────────────────
 
 def markdown_to_html_with_styling(markdown: str, metadata: Dict[str, Any]) -> str:
+    toc            = metadata.get("table_of_contents") or []
+    sections_meta  = metadata.get("sections") or []
+    raw_default    = metadata.get("default_style") or {}
+    raw_title      = (metadata.get("title") or {}).get("style") or {}
 
-    sections = metadata.get("sections", [])
-    basic_style = metadata.get("basic_style", {})
-    title_style = metadata.get("title", {}).get("style", {})
+    # ── 1. Body baseline ──────────────────────────────────────────────────────
+    # Alignment for body text is ALWAYS "left" – override whatever the template says.
+    _HARDCODED = {
+        "font_name": "Calibri", "font_size": 11, "bold": False,
+        "italic": False, "underline": False, "color": "000000",
+        "alignment": "left",
+    }
+    body_base = {**_HARDCODED, **raw_default}
+    body_base["alignment"] = "left"   # force: body text is never centred
 
-    merged_heading_style = {}
-    merged_subheading_style = {}
-    merged_body_style = {}
-    merged_list_style = {}
-    merged_table_style = {}
+    # ── 2. Title style ────────────────────────────────────────────────────────
+    # Title MAY have its own alignment (e.g. centred); default to "left".
+    title_style = {**body_base, **raw_title}
+    title_style.setdefault("alignment", "left")
 
-    for sec in sections:
-        if not isinstance(sec, dict):
-            continue
-        has_heading = bool(sec.get("heading", "").strip())
-        sec_styles = sec.get("styles", {})
-        hs = sec.get("heading_style", {})
+    # ── 3. Build the section → element-type → style lookup dictionary ─────────
+    #
+    # Shape:
+    #   {
+    #     "introduction": {
+    #         "heading":    { ...style with alignment from template... },
+    #         "subheading": { ...style with alignment from template... },
+    #         "paragraph":  { ...style with alignment FORCED to "left"... },
+    #         "list_item":  { ...style with alignment FORCED to "left"... },
+    #         "table":      { ...style with alignment FORCED to "left"... },
+    #     },
+    #     ...
+    #   }
+    #
+    # Alignment is baked in here once so the renderer never has to think about it.
 
-        if has_heading:
-            if hs and not merged_heading_style:
-                merged_heading_style = hs
-            for key, target in [
-                ("subheading", merged_subheading_style),
-                ("paragraph",  merged_body_style),
-                ("list_item",  merged_list_style),
-                ("table",      merged_table_style),
-            ]:
-                src = sec_styles.get(key, {})
-                if src and not target:
-                    target.update(src)
+    def _style(override: Optional[dict], force_left: bool) -> dict:
+        """Merge override onto body_base. If force_left, alignment is always 'left'."""
+        result = {**body_base, **(override or {})}
+        if force_left:
+            result["alignment"] = "left"
+        else:
+            result.setdefault("alignment", "left")
+        return result
 
-    # Fallbacks
-    if not merged_heading_style:
-        merged_heading_style = basic_style
-    if not title_style:
-        title_style = merged_heading_style or basic_style
-    if not merged_body_style:
-        merged_body_style = basic_style or {"font_name": "Calibri", "font_size": 11, "bold": False, "italic": False, "underline": False, "color": "000000"}
-    if not merged_subheading_style:
-        merged_subheading_style = merged_heading_style
-    if not merged_list_style:
-        merged_list_style = merged_body_style
-    if not merged_table_style:
-        merged_table_style = merged_body_style
+    section_styles: Dict[str, Dict[str, Any]] = {}
+    for idx, heading_text in enumerate(toc):
+        sec = sections_meta[idx] if idx < len(sections_meta) else {}
+        es  = sec.get("element_styles") or {}
+        key = _normalize_heading(heading_text)
+        section_styles[key] = {
+            # Headings & subheadings: use template alignment (or "left")
+            "heading":    _style(sec.get("heading_style"), force_left=False),
+            "subheading": _style(es.get("subheading"),     force_left=False),
+            # Body elements: alignment is ALWAYS "left"
+            "paragraph":  _style(es.get("paragraph"),  force_left=True),
+            "list_item":  _style(es.get("list_item"),   force_left=True),
+            "table":      _style(es.get("table"),       force_left=True),
+        }
 
-    h1_size = title_style.get("font_size", 18)
-    h2_size = merged_heading_style.get("font_size", max(float(h1_size) - 2, 14))
-    h3_size = merged_subheading_style.get("font_size", max(float(h2_size) - 2, 12))
+    # ── 4. CSS helpers ────────────────────────────────────────────────────────
+    _VALID_ALIGNS = {"left", "center", "right", "justify"}
 
-    def _css_color(style_dict, fallback="000000"):
-        c = style_dict.get("color", fallback) or fallback
-        return c.lstrip("#")
+    def css_color(s: dict) -> str:
+        return str(s.get("color", "000000") or "000000").lstrip("#")
 
-    css_styles = f"""
+    def css_align(s: dict) -> str:
+        a = str(s.get("alignment", "left") or "left").strip().lower()
+        return a if a in _VALID_ALIGNS else "left"
+
+    def inline_style(s: dict, include_spacing: bool = False) -> str:
+        """
+        Build an inline CSS string for element s.
+        s['alignment'] is read directly – it was baked correctly during dict build.
+        No fallback chains, no inheritance possible.
+        """
+        parts = [
+            f"font-family: '{s.get('font_name', 'Calibri')}', Arial, sans-serif",
+            f"font-size: {s.get('font_size', 11)}pt",
+            f"font-weight: {'bold' if s.get('bold') else 'normal'}",
+            f"font-style: {'italic' if s.get('italic') else 'normal'}",
+            f"text-decoration: {'underline' if s.get('underline') else 'none'}",
+            f"color: #{css_color(s)}",
+            # !important ensures Chromium's UA print stylesheet cannot override
+            # the alignment we explicitly set per element.
+            f"text-align: {css_align(s)} !important",
+        ]
+        if include_spacing and s.get("line_spacing") is not None:
+            parts.append(f"line-height: {s.get('line_spacing')}")
+        return "; ".join(parts)
+
+    # ── 5. Global CSS ─────────────────────────────────────────────────────────
+    css = f"""
     <style>
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-        body {{
-            font-family: '{merged_body_style.get('font_name', 'Calibri')}', Arial, sans-serif;
-            font-size: {merged_body_style.get('font_size', 11)}pt;
-            line-height: {merged_body_style.get('line_spacing', 1.15)};
-            color: #{_css_color(merged_body_style)};
+        /* @page sets the PRINT page margins – this is what Chromium/Gotenberg
+           actually respects when rendering to PDF. body margin is ignored in
+           print mode by most Chromium-based renderers. */
+        @page {{
+            size: Letter;
             margin: 1in;
         }}
-        h1 {{
-            font-family: '{title_style.get('font_name', 'Calibri')}', Arial, sans-serif;
-            font-size: {h1_size}pt;
-            font-weight: {'bold' if title_style.get('bold') else 'normal'};
-            font-style: {'italic' if title_style.get('italic') else 'normal'};
-            text-decoration: {'underline' if title_style.get('underline') else 'none'};
-            color: #{_css_color(title_style)};
-            text-align: {title_style.get('alignment', 'left')};
-            margin-top: 14pt;
-            margin-bottom: 6pt;
-            border-bottom: 2px solid #333;
-            padding-bottom: 4pt;
-        }}
-        h2 {{
-            font-family: '{merged_heading_style.get('font_name', 'Calibri')}', Arial, sans-serif;
-            font-size: {h2_size}pt;
-            font-weight: {'bold' if merged_heading_style.get('bold') else 'normal'};
-            font-style: {'italic' if merged_heading_style.get('italic') else 'normal'};
-            text-decoration: {'underline' if merged_heading_style.get('underline') else 'none'};
-            color: #{_css_color(merged_heading_style)};
-            text-align: {merged_heading_style.get('alignment', 'left')};
-            margin-top: 10pt;
-            margin-bottom: 4pt;
-        }}
-        h3, h4, h5, h6 {{
-            font-family: '{merged_subheading_style.get('font_name', 'Calibri')}', Arial, sans-serif;
-            font-size: {h3_size}pt;
-            font-weight: bold;
-            color: #{_css_color(merged_subheading_style)};
-            text-align: {merged_subheading_style.get('alignment', 'left')};
-            margin-top: 8pt;
-            margin-bottom: 4pt;
-        }}
-        p {{
-            font-family: '{merged_body_style.get('font_name', 'Calibri')}', Arial, sans-serif;
-            font-size: {merged_body_style.get('font_size', 11)}pt;
-            font-weight: {'bold' if merged_body_style.get('bold') else 'normal'};
-            font-style: {'italic' if merged_body_style.get('italic') else 'normal'};
-            text-decoration: {'underline' if merged_body_style.get('underline') else 'none'};
-            color: #{_css_color(merged_body_style)};
-            text-align: {merged_body_style.get('alignment', 'left')};
-            margin: 6pt 0 !important;
-        }}
-        ul, ol {{
-            display: block !important;
-            margin: 6pt 0 8pt 0 !important;
-            padding-left: 24pt !important;
-            clear: both !important;
-        }}
-        li {{
-            display: list-item !important;
-            margin: 2pt 0 !important;
-            padding-left: 0 !important;
-            font-family: '{merged_list_style.get('font_name', merged_body_style.get('font_name', 'Calibri'))}', Arial, sans-serif;
-            font-size: {merged_list_style.get('font_size', merged_body_style.get('font_size', 11))}pt;
-            font-weight: {'bold' if merged_list_style.get('bold') else 'normal'};
-            font-style: {'italic' if merged_list_style.get('italic') else 'normal'};
-            text-align: {merged_list_style.get('alignment', merged_body_style.get('alignment', 'left'))};
-            color: #{_css_color(merged_list_style, _css_color(merged_body_style))};
-        }}
-        h1, h2, h3, h4, h5, h6, p, table {{
-            clear: both !important;
-            margin-left: 0 !important;
-            padding-left: 0 !important;
-        }}
-        table {{
-            border-collapse: collapse;
-            width: 100%;
-            margin: 12pt 0;
-        }}
-        th, td {{
-            border: 1px solid #ccc;
-            padding: 6pt 8pt;
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: '{body_base.get('font_name', 'Calibri')}', Arial, sans-serif;
+            font-size: {body_base.get('font_size', 11)}pt;
+            line-height: {body_base.get('line_spacing', 1.15)};
+            color: #{css_color(body_base)};
+            /* text-align default – each element overrides via inline style */
             text-align: left;
-            font-family: '{merged_table_style.get('font_name', merged_body_style.get('font_name', 'Calibri'))}', Arial, sans-serif;
-            font-size: {merged_table_style.get('font_size', merged_body_style.get('font_size', 11))}pt;
-            color: #{_css_color(merged_table_style, _css_color(merged_body_style))};
         }}
-        th {{
-            background-color: #f0f0f0;
-            font-weight: bold;
+        /* Hard left-align baseline; each element's inline style !important
+           overrides this where a different alignment is needed (e.g. title). */
+        h1, h2, h3, h4, h5, h6, p, li, td, th {{ text-align: left; }}
+        ul, ol {{ display: block !important; margin: 6pt 0 8pt 0 !important;
+                  padding-left: 24pt !important; clear: both !important; }}
+        h1, h2, h3, h4, h5, h6, p, table {{
+            clear: both !important; margin-left: 0 !important; padding-left: 0 !important;
         }}
-        pre, code {{
-            font-family: 'Courier New', monospace;
-            font-size: 10pt;
-            background: #f5f5f5;
-            padding: 2pt 4pt;
-        }}
-        pre {{
-            padding: 8pt;
-            margin: 8pt 0;
-            overflow-x: auto;
-        }}
+        table {{ border-collapse: collapse; width: 100%; margin: 12pt 0; }}
+        th, td {{ border: 1px solid #ccc; padding: 6pt 8pt; }}
+        th {{ background-color: #f0f0f0; font-weight: bold; }}
+        pre, code {{ font-family: 'Courier New', monospace; font-size: 10pt;
+                     background: #f5f5f5; padding: 2pt 4pt; }}
+        pre {{ padding: 8pt; margin: 8pt 0; overflow-x: auto; }}
+        p {{ margin: 6pt 0 !important; }}
+        li {{ margin: 2pt 0 !important; }}
     </style>
     """
 
-    # Basic markdown to HTML conversion
-    html_content = markdown_to_basic_html(markdown)
+    html_body = _render_markdown(
+        markdown, section_styles, title_style, body_base, inline_style
+    )
 
     return f"""
     <!DOCTYPE html>
     <html>
-    <head>
-        <meta charset="UTF-8">
-        {css_styles}
-    </head>
-    <body>
-        {html_content}
-    </body>
+    <head><meta charset="UTF-8">{css}</head>
+    <body>{html_body}</body>
     </html>
     """
 
-def markdown_to_basic_html(markdown: str) -> str:
+
+# ── Renderer ──────────────────────────────────────────────────────────────────
+
+def _render_markdown(
+    markdown: str,
+    section_styles: Dict[str, Dict[str, Any]],
+    title_style: Dict[str, Any],
+    body_base: Dict[str, Any],
+    inline_style_fn,        # fn(style_dict: dict, include_spacing: bool) -> str
+) -> str:
     """
-    Basic markdown to HTML conversion.
-    Supports headers, paragraphs, bold, italic, lists, tables, and code blocks.
+    Iterate the markdown line by line.
+
+    Alignment strategy
+    ------------------
+    * When a '## Section Heading' is encountered, look it up in section_styles
+      and set current_sec to that section's style dict.
+    * Every element rendered (p, li, h2, h3, table cell) calls inline_style_fn
+      with its own style dict, which already has the correct 'text-align' baked in.
+    * No element can inherit another's alignment – each carries its own inline style.
     """
-    lines = markdown.split("\n")
-    html_lines = []
+    # Default section: all elements use body_base (alignment = "left")
+    _default_sec: Dict[str, Any] = {k: body_base for k in
+                                     ("heading", "subheading", "paragraph", "list_item", "table")}
+    current_sec: Dict[str, Any] = (
+        next(iter(section_styles.values()), _default_sec)
+        if section_styles else _default_sec
+    )
+
+    html_lines: List[str] = []
     in_code_block = False
-    in_list = False          
-    list_tag = "ul"          
-    in_table = False
+    in_list       = False
+    list_tag      = "ul"
+    in_table      = False
+
+    def cur(kind: str) -> dict:
+        """Return the style dict for element-type `kind` in the current section."""
+        return current_sec.get(kind, body_base)
 
     def close_list():
         nonlocal in_list, list_tag
         if in_list:
             html_lines.append(f"</{list_tag}>")
-            html_lines.append('<div style="clear:both;margin:0;padding:0;line-height:0;height:0;font-size:0;"></div>')
-            in_list = False
+            html_lines.append(
+                '<div style="clear:both;margin:0;padding:0;line-height:0;height:0;font-size:0;"></div>'
+            )
+            in_list  = False
             list_tag = "ul"
 
     def close_table():
@@ -207,10 +204,11 @@ def markdown_to_basic_html(markdown: str) -> str:
             html_lines.append("</tbody></table>")
             in_table = False
 
-    for line in lines:
+    for line in markdown.split("\n"):
+
+        # ── Code fence ────────────────────────────────────────────────────────
         if line.strip().startswith("```"):
-            close_list()
-            close_table()
+            close_list(); close_table()
             if in_code_block:
                 html_lines.append("</code></pre>")
                 in_code_block = False
@@ -221,73 +219,115 @@ def markdown_to_basic_html(markdown: str) -> str:
             continue
 
         if in_code_block:
-            html_lines.append(line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+            html_lines.append(
+                line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            )
             continue
 
+        # ── Blank line ────────────────────────────────────────────────────────
         if not line.strip():
-            close_list()
-            close_table()
+            close_list(); close_table()
             html_lines.append('<div style="margin:0;padding:0;height:6pt;"></div>')
             continue
 
         stripped = line.strip()
 
-        # Markdown table rows
+        # ── Table rows ────────────────────────────────────────────────────────
         if stripped.startswith("|") and stripped.endswith("|"):
             close_list()
             if re.match(r"^\|[\s\-\|:]+\|$", stripped):
-                continue
-            cells = [c.strip() for c in stripped.strip("|").split("|")]
+                continue                          # separator row
+            cells    = [c.strip() for c in stripped.strip("|").split("|")]
+            t_style  = inline_style_fn(cur("table"), False)
             if not in_table:
-                html_lines.append('<table><thead><tr>')
+                html_lines.append(f'<table style="{t_style}"><thead><tr>')
                 for c in cells:
-                    html_lines.append(f"<th>{format_inline_markdown(c)}</th>")
+                    html_lines.append(f'<th style="{t_style}">{format_inline_markdown(c)}</th>')
                 html_lines.append("</tr></thead><tbody>")
                 in_table = True
             else:
                 html_lines.append("<tr>")
                 for c in cells:
-                    html_lines.append(f"<td>{format_inline_markdown(c)}</td>")
+                    html_lines.append(f'<td style="{t_style}">{format_inline_markdown(c)}</td>')
                 html_lines.append("</tr>")
             continue
 
         close_table()
 
-        header_match = re.match(r"^(#{1,6})\s+(.*)", stripped)
-        if header_match:
+        # ── Headings ──────────────────────────────────────────────────────────
+        hm = re.match(r"^(#{1,6})\s+(.*)", stripped)
+        if hm:
             close_list()
-            level = len(header_match.group(1))
-            text = format_inline_markdown(header_match.group(2).strip())
-            html_lines.append(f"<h{level}>{text}</h{level}>")
+            level = len(hm.group(1))
+            text  = hm.group(2).strip()
+
+            if level == 1:
+                # Document title – uses title_style (may be centred)
+                html_lines.append(
+                    f'<h1 style="{inline_style_fn(title_style, True)};'
+                    f' margin-top: 14pt; margin-bottom: 6pt;'
+                    f' border-bottom: 2px solid #333; padding-bottom: 4pt;">'
+                    f'{format_inline_markdown(text)}</h1>'
+                )
+
+            elif level == 2:
+                # Section heading: switch current section, then render with its heading style
+                key = _normalize_heading(text)
+                if key in section_styles:
+                    current_sec = section_styles[key]
+                html_lines.append(
+                    f'<h2 style="{inline_style_fn(cur("heading"), True)};'
+                    f' margin-top: 10pt; margin-bottom: 4pt;">'
+                    f'{format_inline_markdown(text)}</h2>'
+                )
+
+            elif level == 3:
+                html_lines.append(
+                    f'<h3 style="{inline_style_fn(cur("subheading"), True)};'
+                    f' margin-top: 8pt; margin-bottom: 4pt;">'
+                    f'{format_inline_markdown(text)}</h3>'
+                )
+
+            else:
+                html_lines.append(f"<h{level}>{format_inline_markdown(text)}</h{level}>")
             continue
 
-        # Unordered lists
-        ul_match = re.match(r"^[-*+]\s+(.*)", stripped)
-        if ul_match:
+        # ── Unordered list ────────────────────────────────────────────────────
+        ul_m = re.match(r"^[-*+]\s+(.*)", stripped)
+        if ul_m:
             if in_list and list_tag == "ol":
                 close_list()
             if not in_list:
                 html_lines.append("<ul>")
-                in_list = True
+                in_list  = True
                 list_tag = "ul"
-            html_lines.append(f"<li>{format_inline_markdown(ul_match.group(1))}</li>")
+            html_lines.append(
+                f'<li style="{inline_style_fn(cur("list_item"), False)}">'
+                f'{format_inline_markdown(ul_m.group(1))}</li>'
+            )
             continue
 
-        # Ordered lists
-        ol_match = re.match(r"^\d+[.)]\s+(.*)", stripped)
-        if ol_match:
+        # ── Ordered list ──────────────────────────────────────────────────────
+        ol_m = re.match(r"^\d+[.)]\s+(.*)", stripped)
+        if ol_m:
             if in_list and list_tag == "ul":
                 close_list()
             if not in_list:
                 html_lines.append("<ol>")
-                in_list = True
+                in_list  = True
                 list_tag = "ol"
-            html_lines.append(f"<li>{format_inline_markdown(ol_match.group(1))}</li>")
+            html_lines.append(
+                f'<li style="{inline_style_fn(cur("list_item"), False)}">'
+                f'{format_inline_markdown(ol_m.group(1))}</li>'
+            )
             continue
 
-        # Paragraphs
+        # ── Paragraph ─────────────────────────────────────────────────────────
         close_list()
-        html_lines.append(f"<p>{format_inline_markdown(stripped)}</p>")
+        html_lines.append(
+            f'<p style="{inline_style_fn(cur("paragraph"), True)}">'
+            f'{format_inline_markdown(stripped)}</p>'
+        )
 
     close_list()
     close_table()
@@ -296,13 +336,13 @@ def markdown_to_basic_html(markdown: str) -> str:
 
     return "\n".join(html_lines)
 
+
+# ── Inline markdown formatting ────────────────────────────────────────────────
+
 def format_inline_markdown(text: str) -> str:
-    # Bold
     text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
-    text = re.sub(r'__(.+?)__', r'<strong>\1</strong>', text)
-    # Italic
-    text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
-    text = re.sub(r'_(.+?)_', r'<em>\1</em>', text)
-    # Code
-    text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
+    text = re.sub(r'__(.+?)__',     r'<strong>\1</strong>', text)
+    text = re.sub(r'\*(.+?)\*',     r'<em>\1</em>',         text)
+    text = re.sub(r'_(.+?)_',       r'<em>\1</em>',         text)
+    text = re.sub(r'`(.+?)`',       r'<code>\1</code>',     text)
     return text

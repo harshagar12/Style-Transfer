@@ -2,6 +2,7 @@ fastapi
 python-docx
 uvicorn
 python-multipart
+pdf2docx
 PyMuPDF
 google-generativeai
 python-dotenv

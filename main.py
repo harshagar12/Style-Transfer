@@ -10,7 +10,7 @@ from docx import Document
 
 from config import METADATA_DIR, GOTENBERG_URL
 from models import GenerateRequest, MarkdownGenerateRequest, PDFGenerateRequest
-from utils_extraction import extract_metadata_from_docx
+from utils_extraction import extract_metadata_from_docx, extract_metadata_from_pdf
 from utils_generation import detect_structure, generate_docx
 from utils_markdown import markdown_to_html_with_styling
 
@@ -26,13 +26,19 @@ async def upload_template(
     template_name: str = Form(None)
 ):
 
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".docx")
+    filename = file.filename or ""
+    is_pdf = filename.lower().endswith(".pdf")
+    suffix = ".pdf" if is_pdf else ".docx"
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     tmp.write(await file.read())
     tmp.close()
 
-    doc = Document(tmp.name)
-
-    metadata = extract_metadata_from_docx(doc)
+    if is_pdf:
+        metadata = extract_metadata_from_pdf(tmp.name)
+    else:
+        doc = Document(tmp.name)
+        metadata = extract_metadata_from_docx(doc)
 
     if template_name and template_name.strip():
         if "title" not in metadata or not isinstance(metadata["title"], dict):
@@ -72,30 +78,21 @@ def _run_markdown_job(job_id: str, req: MarkdownGenerateRequest):
         with open(meta_path) as f:
             metadata = json.load(f)
 
-        sections = metadata.get("sections", [])
+        toc       = metadata.get("table_of_contents", [])
+        sections  = metadata.get("sections", [])
         title_text = metadata.get("title", {}).get("text", "").strip() or "Generated Report"
 
         section_schema_lines = []
-        for sec in sections:
-            heading = sec.get("heading", "")
-            content_items = sec.get("content", [])
+        for index, heading in enumerate(toc):
+            sec        = sections[index] if index < len(sections) else {}
+            components = sec.get("components", [])
             section_schema_lines.append(f"## {heading}")
-            for item in content_items:
-                t = item.get("type", "paragraph")
-                if t == "subheading":
-                    section_schema_lines.append("  ### [subheading here]")
-                elif t == "list_item":
-                    section_schema_lines.append("  - [list item here]")
-                elif t == "table":
-                    rows = item.get("rows", 2)
-                    cols = item.get("cols", 2)
-                    section_schema_lines.append(f"  [table: {rows} rows x {cols} cols]")
-                else:
-                    section_schema_lines.append("  [paragraph here]")
+            if components:
+                section_schema_lines.append(f"  Elements: {', '.join(components)}")
         section_schema = "\n".join(section_schema_lines)
 
         template_context = f"""
-Template Structure (follow this EXACTLY — same number of sections, same order, same heading names, same content block types in each section):
+Template Structure (follow this EXACTLY — same number of sections, same order, same heading names, same section elements):
 
 {section_schema}
 
@@ -108,9 +105,9 @@ Generate a professional report in Markdown using this prompt:
 
 STRICT INSTRUCTIONS:
 1. First line MUST be a level 1 heading ("# <Your Generated Title>") that reflects the prompt's subject.
-2. You MUST produce exactly {len(sections)} sections in the SAME ORDER as the schema above.
+2. You MUST produce exactly {len(toc)} sections in the SAME ORDER as the schema above.
 3. Each section MUST use the EXACT heading text shown in the schema.
-4. Inside each section, reproduce the SAME sequence of content blocks:
+4. Inside each section, include the following types of content blocks (order is flexible, but each listed type should appear at least once):
    - "### subheading" → write a real ### subheading
    - "- list item" → write a real bullet list item
    - "[table: N rows x M cols]" → write a real markdown table with that many rows and columns
@@ -163,6 +160,22 @@ async def get_job_status(job_id: str):
         "error": job["error"],
     }
 
+# API Endpoint for Previewing generated HTML (debug)
+@app.post("/preview-html")
+async def preview_html(req: PDFGenerateRequest):
+    """Return the HTML that would be sent to Gotenberg, as plain text for debugging."""
+    from fastapi.responses import PlainTextResponse
+    try:
+        meta_path = os.path.join(METADATA_DIR, f"{req.template_id}.json")
+        if not os.path.exists(meta_path):
+            return PlainTextResponse(f"Template '{req.template_id}' not found", status_code=404)
+        with open(meta_path) as f:
+            metadata = json.load(f)
+        html_content = markdown_to_html_with_styling(req.markdown, metadata)
+        return PlainTextResponse(html_content)
+    except Exception as e:
+        return PlainTextResponse(f"Error: {e}", status_code=500)
+
 # API Endpoint for Converting Markdown to PDF via Gotenberg
 @app.post("/generate-pdf")
 async def generate_pdf(req: PDFGenerateRequest):
@@ -179,10 +192,21 @@ async def generate_pdf(req: PDFGenerateRequest):
 
         html_content = markdown_to_html_with_styling(req.markdown, metadata)
 
+        # Pass margins=0 to Gotenberg so our @page CSS rule is the
+        # single source of truth for page margins and sizing.
         files = {"files": ("index.html", html_content, "text/html")}
+        data  = {
+            "marginTop":        "0",
+            "marginBottom":     "0",
+            "marginLeft":       "0",
+            "marginRight":      "0",
+            "preferCssPageSize": "true",
+            "printBackground":   "true",
+        }
         response = requests.post(
             f"{GOTENBERG_URL}/forms/chromium/convert/html",
-            files=files
+            files=files,
+            data=data,
         )
 
         if response.status_code == 200:
